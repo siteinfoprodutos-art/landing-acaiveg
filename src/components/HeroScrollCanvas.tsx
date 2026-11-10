@@ -2,29 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MessageCircle, ArrowDown } from 'lucide-react';
 import { IMAGES, getWhatsAppLink } from '../constants';
 
+const FRAME_COUNT = 90;
 const DESKTOP_SCALE = 0.75; // 1 = full size; 0.75 = refined desktop size
 const MOBILE_SCALE = 0.92;   // 92% on mobile for clean breathing room without clipping top/bottom
-
-const VIDEO_SRC = '/assets/aistudio/Layers_floating_above_a_a__cup_56da53fb_20a05278.mp4';
 
 export const HeroScrollCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaderFading, setIsLoaderFading] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
 
-  // Map of index -> ImageBitmap for progressive loading
-  const loadedBitmapsRef = useRef<Map<number, ImageBitmap>>(new Map());
-  const totalFramesRef = useRef(90);
-
-  // Cached layout & scroll references
-  const heroTopRef = useRef(0);
-  const heroHeightRef = useRef(1);
-  const innerHeightRef = useRef(1);
+  // Array of preloaded HTMLImageElements (1 to 90)
+  const imagesRef = useRef<HTMLImageElement[]>([]);
+  const loadedCountRef = useRef(0);
 
   // Target and Lerp Frame tracking
   const currentFrameRef = useRef(0);
@@ -37,173 +30,44 @@ export const HeroScrollCanvas: React.FC = () => {
     if (params.get('debug') === '1') setIsDebugMode(true);
   }, []);
 
-  // Recalculate layout metrics (heroTop and heroHeight) robustly
-  const updateLayoutMetrics = () => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const scrollY = window.scrollY || window.pageYOffset || 0;
-    const computedTop = rect.top + scrollY;
-    const computedHeight = rect.height;
-    const viewportH = window.innerHeight || 1;
-
-    heroTopRef.current = !isNaN(computedTop) && computedTop >= 0 ? computedTop : 0;
-    heroHeightRef.current = !isNaN(computedHeight) && computedHeight > 0 ? computedHeight : viewportH * 4;
-    innerHeightRef.current = viewportH;
-
-    if (isDebugMode) {
-      console.log('[DEBUG] Layout recalculated:', {
-        heroTop: heroTopRef.current,
-        heroHeight: heroHeightRef.current,
-        innerHeight: innerHeightRef.current,
-      });
-    }
-  };
-
-  // Periodically recalculate layout metrics for 5s after mount
+  // Preload all 90 WebP frames progressively
   useEffect(() => {
-    updateLayoutMetrics();
-    const interval = setInterval(() => {
-      updateLayoutMetrics();
-    }, 1000);
-
-    const timer = setTimeout(() => {
-      clearInterval(interval);
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timer);
-    };
-  }, [isDebugMode]);
-
-  // Progressive Frame Extraction Engine with Live Video Fallback
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
     let isCancelled = false;
+    const images: HTMLImageElement[] = [];
 
-    // Safety timeout: fade loader after max 1.5s regardless
+    // Safety timeout: remove loader after max 1.2s regardless
     const safetyTimer = setTimeout(() => {
       setIsLoaderFading(true);
-      setTimeout(() => setIsLoading(false), 400);
-    }, 1500);
+      setTimeout(() => setIsLoading(false), 350);
+    }, 1200);
 
-    const extractProgressiveFrames = async () => {
-      try {
-        video.muted = true;
-        video.playsInline = true;
+    // Create 90 image instances
+    for (let i = 1; i <= FRAME_COUNT; i++) {
+      const img = new Image();
+      const numStr = String(i).padStart(4, '0');
+      img.src = `/frames/frame_${numStr}.webp`;
 
-        if (video.readyState < 2) {
-          await new Promise<void>((resolve) => {
-            const onLoaded = () => {
-              video.removeEventListener('loadeddata', onLoaded);
-              video.removeEventListener('canplay', onLoaded);
-              resolve();
-            };
-            video.addEventListener('loadeddata', onLoaded);
-            video.addEventListener('canplay', onLoaded);
-            setTimeout(onLoaded, 500);
-          });
-        }
-
-        const duration = video.duration || 4.0;
-        const isMobile = window.innerWidth < 640;
-        const totalFrames = isMobile ? 60 : 90;
-        totalFramesRef.current = totalFrames;
-
-        const vWidth = video.videoWidth || (isMobile ? 720 : 1080);
-        const vHeight = video.videoHeight || (isMobile ? 1280 : 1920);
-
-        const targetWidth = isMobile ? 720 : 1080;
-        const aspect = vHeight / vWidth;
-        const targetHeight = Math.round(targetWidth * aspect);
-
-        const offCanvas = document.createElement('canvas');
-        offCanvas.width = targetWidth;
-        offCanvas.height = targetHeight;
-        const offCtx = offCanvas.getContext('2d', { alpha: false, desynchronized: true });
-
-        // Extract a specific frame index cleanly
-        const extractSingleFrame = async (idx: number): Promise<ImageBitmap | null> => {
-          if (isCancelled || !offCtx) return null;
-          if (loadedBitmapsRef.current.has(idx)) return loadedBitmapsRef.current.get(idx)!;
-
-          const targetTime = (idx / (totalFrames - 1)) * duration;
-          video.currentTime = targetTime;
-
-          await new Promise<void>((resolve) => {
-            let timeoutId: NodeJS.Timeout;
-            const onSeeked = () => {
-              clearTimeout(timeoutId);
-              video.removeEventListener('seeked', onSeeked);
-              resolve();
-            };
-            video.addEventListener('seeked', onSeeked);
-            timeoutId = setTimeout(onSeeked, 250);
-          });
-
-          offCtx.drawImage(video, 0, 0, targetWidth, targetHeight);
-          try {
-            const bitmap = await createImageBitmap(offCanvas);
-            loadedBitmapsRef.current.set(idx, bitmap);
-            return bitmap;
-          } catch (e) {
-            return null;
-          }
-        };
-
-        // PASS 1: Frame 0 & Last Frame
-        await extractSingleFrame(0);
-        if (!isCancelled) {
+      img.onload = () => {
+        loadedCountRef.current += 1;
+        // As soon as the first frame loads, release the loader immediately
+        if (i === 1 && !isCancelled) {
           setIsLoaderFading(true);
-          setTimeout(() => setIsLoading(false), 400);
+          setTimeout(() => setIsLoading(false), 350);
         }
+      };
 
-        await extractSingleFrame(totalFrames - 1);
-        updateLayoutMetrics();
+      images.push(img);
+    }
 
-        // PASS 2: Stride 6 (0, 6, 12, 18, ...)
-        for (let i = 0; i < totalFrames; i += 6) {
-          if (isCancelled) return;
-          await extractSingleFrame(i);
-        }
-
-        // PASS 3: Stride 3 (3, 9, 15, ...)
-        for (let i = 3; i < totalFrames; i += 6) {
-          if (isCancelled) return;
-          await extractSingleFrame(i);
-        }
-
-        // PASS 4: All remaining frames in small background batches
-        for (let i = 0; i < totalFrames; i++) {
-          if (isCancelled) return;
-          if (!loadedBitmapsRef.current.has(i)) {
-            await extractSingleFrame(i);
-            if (i % 6 === 0) {
-              await new Promise((res) => setTimeout(res, 10));
-            }
-          }
-        }
-
-        updateLayoutMetrics();
-        clearTimeout(safetyTimer);
-      } catch (err) {
-        if (isDebugMode) console.warn('[DEBUG] Erro na extração de frames:', err);
-        setIsLoaderFading(true);
-        setTimeout(() => setIsLoading(false), 400);
-      }
-    };
-
-    extractProgressiveFrames();
+    imagesRef.current = images;
 
     return () => {
       isCancelled = true;
       clearTimeout(safetyTimer);
     };
-  }, [isDebugMode]);
+  }, []);
 
-  // IntersectionObserver to pause render loop when Hero is out of viewport
+  // IntersectionObserver to pause render loop when Hero is completely off-screen
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -221,75 +85,69 @@ export const HeroScrollCanvas: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Passive Scroll & Debounced Resize Handler
+  // Scroll Progress Calculation directly from container bounds
   useEffect(() => {
     const handleScroll = () => {
-      const scrollY = window.scrollY || window.pageYOffset || 0;
-      const top = heroTopRef.current || 0;
-      const height = heroHeightRef.current || (window.innerHeight * 4);
-      const innerH = innerHeightRef.current || window.innerHeight;
+      if (!containerRef.current) return;
 
-      const totalScrollable = Math.max(1, height - innerH);
-      const progress = Math.min(Math.max((scrollY - top) / totalScrollable, 0), 1);
+      const rect = containerRef.current.getBoundingClientRect();
+      const totalScrollable = rect.height - window.innerHeight;
+
+      if (totalScrollable <= 0) return;
+
+      // When at top, rect.top = 0. As you scroll down, rect.top is negative.
+      const currentScroll = -rect.top;
+      const progress = Math.min(Math.max(currentScroll / totalScrollable, 0), 1);
 
       setScrollProgress(progress);
-      targetFrameRef.current = progress * (totalFramesRef.current - 1);
-
-      // Also update videocurrentTime directly if bitmaps aren't fully extracted yet
-      if (videoRef.current && loadedBitmapsRef.current.size < 10) {
-        const duration = videoRef.current.duration || 4.0;
-        videoRef.current.currentTime = progress * duration;
-      }
+      targetFrameRef.current = progress * (FRAME_COUNT - 1);
 
       if (isDebugMode) {
-        console.log(`[DEBUG] Scroll: progress=${progress.toFixed(3)}, targetFrame=${targetFrameRef.current.toFixed(1)}, loadedCount=${loadedBitmapsRef.current.size}`);
+        console.log(
+          `[DEBUG] Scroll: progress=${progress.toFixed(3)}, targetFrame=${targetFrameRef.current.toFixed(1)}, loaded=${loadedCountRef.current}/${FRAME_COUNT}`
+        );
       }
-    };
-
-    let resizeTimer: NodeJS.Timeout;
-    const handleResize = () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        updateLayoutMetrics();
-        handleScroll();
-      }, 150);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize, { passive: true });
-    window.addEventListener('orientationchange', handleResize, { passive: true });
+    window.addEventListener('resize', handleScroll, { passive: true });
+    window.addEventListener('orientationchange', handleScroll, { passive: true });
 
     handleScroll();
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-      clearTimeout(resizeTimer);
+      window.removeEventListener('resize', handleScroll);
+      window.removeEventListener('orientationchange', handleScroll);
     };
   }, [isDebugMode]);
 
-  // Helper to find closest already loaded frame
-  const getClosestLoadedFrame = (targetIdx: number): ImageBitmap | null => {
-    const map = loadedBitmapsRef.current;
-    if (map.size === 0) return null;
+  // Helper to find closest already loaded image
+  const getClosestLoadedImage = (targetIdx: number): HTMLImageElement | null => {
+    const images = imagesRef.current;
+    if (!images || images.length === 0) return null;
 
-    const roundedTarget = Math.round(targetIdx);
-    if (map.has(roundedTarget)) return map.get(roundedTarget)!;
+    const rounded = Math.min(FRAME_COUNT - 1, Math.max(0, Math.round(targetIdx)));
+    if (images[rounded]?.complete && images[rounded].naturalWidth > 0) {
+      return images[rounded];
+    }
 
-    let bestIdx = -1;
-    let minDiff = Infinity;
-    for (const idx of map.keys()) {
-      const diff = Math.abs(idx - targetIdx);
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestIdx = idx;
+    // Search outwards from target
+    for (let dist = 1; dist < FRAME_COUNT; dist++) {
+      const prev = rounded - dist;
+      if (prev >= 0 && images[prev]?.complete && images[prev].naturalWidth > 0) {
+        return images[prev];
+      }
+      const next = rounded + dist;
+      if (next < FRAME_COUNT && images[next]?.complete && images[next].naturalWidth > 0) {
+        return images[next];
       }
     }
-    return bestIdx >= 0 ? map.get(bestIdx)! : null;
+
+    return null;
   };
 
-  // Canvas Render Loop
+  // Canvas Render Loop with Delta-Time Lerp
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -338,12 +196,10 @@ export const HeroScrollCanvas: React.FC = () => {
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      const closestBitmap = getClosestLoadedFrame(currentFrameRef.current);
+      const closestImg = getClosestLoadedImage(currentFrameRef.current);
 
-      if (closestBitmap) {
-        drawCoverBitmap(ctx, closestBitmap, displayW, displayH);
-      } else if (videoRef.current && videoRef.current.readyState >= 2) {
-        drawVideoFallback(ctx, videoRef.current, displayW, displayH);
+      if (closestImg) {
+        drawCoverImage(ctx, closestImg, displayW, displayH);
       } else {
         drawProceduralAcaiBackground(ctx, displayW, displayH);
       }
@@ -360,13 +216,25 @@ export const HeroScrollCanvas: React.FC = () => {
       ctx.restore();
     };
 
+    const handleResize = () => {
+      applyCanvasDimensions();
+    };
+
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
+
     animationFrameId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animationFrameId);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
-  const drawCoverBitmap = (
+  const drawCoverImage = (
     ctx: CanvasRenderingContext2D,
-    bitmap: ImageBitmap,
+    img: HTMLImageElement,
     canvasW: number,
     canvasH: number
   ) => {
@@ -375,7 +243,9 @@ export const HeroScrollCanvas: React.FC = () => {
 
     const scale = canvasW >= 1024 ? DESKTOP_SCALE : MOBILE_SCALE;
 
-    const bitmapRatio = bitmap.width / bitmap.height;
+    const imgW = img.naturalWidth || 720;
+    const imgH = img.naturalHeight || 1280;
+    const bitmapRatio = imgW / imgH;
     const canvasRatio = canvasW / canvasH;
     let baseW: number, baseH: number;
 
@@ -392,8 +262,9 @@ export const HeroScrollCanvas: React.FC = () => {
     const offsetX = (canvasW - drawW) / 2;
     const offsetY = (canvasH - drawH) / 2;
 
-    ctx.drawImage(bitmap, offsetX, offsetY, drawW, drawH);
+    ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
+    // Soft vignette/radial gradient blend over frame edges if scaled (< 1)
     if (scale < 1) {
       const padX = drawW * 0.08;
       const padY = drawH * 0.08;
@@ -422,38 +293,6 @@ export const HeroScrollCanvas: React.FC = () => {
       ctx.fillStyle = gradRight;
       ctx.fillRect(offsetX + drawW - padX, offsetY, padX, drawH);
     }
-  };
-
-  const drawVideoFallback = (
-    ctx: CanvasRenderingContext2D,
-    video: HTMLVideoElement,
-    canvasW: number,
-    canvasH: number
-  ) => {
-    ctx.fillStyle = '#1A0B26';
-    ctx.fillRect(0, 0, canvasW, canvasH);
-
-    const scale = canvasW >= 1024 ? DESKTOP_SCALE : MOBILE_SCALE;
-    const vW = video.videoWidth || 720;
-    const vH = video.videoHeight || 1280;
-    const bitmapRatio = vW / vH;
-    const canvasRatio = canvasW / canvasH;
-    let baseW: number, baseH: number;
-
-    if (canvasRatio > bitmapRatio) {
-      baseW = canvasW;
-      baseH = canvasW / bitmapRatio;
-    } else {
-      baseH = canvasH;
-      baseW = canvasH * bitmapRatio;
-    }
-
-    const drawW = baseW * scale;
-    const drawH = baseH * scale;
-    const offsetX = (canvasW - drawW) / 2;
-    const offsetY = (canvasH - drawH) / 2;
-
-    ctx.drawImage(video, offsetX, offsetY, drawW, drawH);
   };
 
   const drawProceduralAcaiBackground = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
@@ -494,16 +333,6 @@ export const HeroScrollCanvas: React.FC = () => {
         style={{ width: `${scrollProgress * 100}%` }}
       />
 
-      {/* Offscreen video element - Same-origin video without crossOrigin attribute */}
-      <video
-        ref={videoRef}
-        src={VIDEO_SRC}
-        muted
-        playsInline
-        preload="auto"
-        className="pointer-events-none opacity-0 absolute w-1 h-1 overflow-hidden z-[-100]"
-      />
-
       {/* Sticky Viewport */}
       <div className="sticky top-0 left-0 w-full h-screen h-[100dvh] overflow-hidden flex items-center justify-center bg-[#0B0710] z-0">
         {/* Fullscreen Video Canvas */}
@@ -516,7 +345,7 @@ export const HeroScrollCanvas: React.FC = () => {
         {/* Clean, Fast Loading Overlay with Logo */}
         {isLoading && (
           <div
-            className={`absolute inset-0 z-40 bg-[#0B0710] flex flex-col items-center justify-center p-6 text-white text-center transition-opacity duration-400 ${
+            className={`absolute inset-0 z-40 bg-[#0B0710] flex flex-col items-center justify-center p-6 text-white text-center transition-opacity duration-350 ${
               isLoaderFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
           >
