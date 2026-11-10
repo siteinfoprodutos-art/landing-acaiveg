@@ -1,0 +1,6 @@
+{
+  "name": "Açaí Veg Laranjeiras",
+  "description": "Landing page oficial da Açaí Veg Laranjeiras. O açaí mais cremoso com toppings irresistíveis, delivery rápido e retirada em Laranjeiras.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
