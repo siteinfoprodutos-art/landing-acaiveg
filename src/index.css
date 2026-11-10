@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 @layer utilities {
+  .font-serif-luxury {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
   .font-baloo {
     font-family: 'Baloo 2', cursive, sans-serif;
   }
@@ -8,51 +11,67 @@
     font-family: 'Poppins', sans-serif;
   }
 
-  /* Scalloped / Wavy Dividers */
-  .wavy-top-green {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,0 C150,90 350,-40 500,40 C650,120 900,10 1200,50 L1200,120 L0,120 Z' fill='%238ec628'%3E%3C/path%3E%3C/svg%3E");
-    background-size: 100% 40px;
-    background-repeat: no-repeat;
+  /* Luxury Dark Palette & Gradients */
+  .bg-dark-base {
+    background-color: #0B0710;
+  }
+  
+  .bg-purple-glow {
+    background: radial-gradient(ellipse at center, #4A1A6B 0%, #2A0F3D 50%, #0B0710 100%);
   }
 
-  /* Ornate Purple Watermark Pattern */
-  .bg-purple-pattern {
-    background-color: #2b0d38;
-    background-image: radial-gradient(#6B2B83 1.5px, transparent 1.5px), radial-gradient(#6B2B83 1.5px, #2b0d38 1.5px);
-    background-size: 60px 60px;
-    background-position: 0 0, 30px 30px;
+  .bg-gold-radial {
+    background: radial-gradient(circle at center, rgba(242, 210, 122, 0.15) 0%, rgba(11, 7, 16, 0) 70%);
   }
 
-  /* Lime Green Accent Section */
-  .bg-lime-acai {
-    background: linear-gradient(180deg, #8bc53f 0%, #689f28 100%);
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #F2D27A 0%, #C9971F 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
-  /* Glossy Pill Buttons */
-  .btn-glossy-green {
-    background: linear-gradient(180deg, #99d52f 0%, #639c1b 100%);
-    box-shadow: 0 4px 15px rgba(100, 160, 20, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  .bg-gold-gradient {
+    background: linear-gradient(135deg, #F2D27A 0%, #C9971F 100%);
   }
 
-  .btn-glossy-red {
-    background: linear-gradient(180deg, #e53935 0%, #b71c1c 100%);
-    box-shadow: 0 4px 15px rgba(200, 30, 30, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  .bg-card-dark {
+    background-color: #1A1420;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 20px;
+  }
+
+  .btn-gold-pill {
+    background: linear-gradient(135deg, #F2D27A 0%, #C9971F 100%);
+    color: #0B0710;
+    font-weight: 700;
+    box-shadow: 0 4px 20px rgba(201, 151, 31, 0.3);
+  }
+
+  .btn-gold-outline {
+    border: 1px solid #C9971F;
+    color: #F2D27A;
+    font-weight: 600;
+  }
+
+  .btn-green-wa {
+    background-color: #3C9A34;
+    color: #ffffff;
+    box-shadow: 0 4px 18px rgba(60, 154, 52, 0.35);
   }
 }
 
 /* Custom smooth scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #2E0F3D;
+  background: #0B0710;
 }
 ::-webkit-scrollbar-thumb {
-  background: #8ec628;
-  border-radius: 5px;
-  border: 2px solid #2E0F3D;
+  background: #C9971F;
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #F5B83D;
+  background: #F2D27A;
 }
 

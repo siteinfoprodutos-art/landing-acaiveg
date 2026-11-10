@@ -58,15 +58,15 @@ export const FloatingWhatsApp: React.FC = () => {
         href={getWhatsAppLink('Olá! Vim pelo botão flutuante e gostaria de fazer um pedido!')}
         target="_blank"
         rel="noopener noreferrer"
-        className="relative w-12 h-12 rounded-full bg-[#3C9A34] hover:bg-[#34852d] flex items-center justify-center text-white shadow-xl opacity-80 hover:opacity-100 scale-95 hover:scale-105 active:scale-95 transition-all duration-300 border border-emerald-300/40"
+        className="relative w-11 h-11 rounded-full bg-[#3C9A34]/85 backdrop-blur-sm hover:bg-[#3C9A34] flex items-center justify-center text-white shadow-xl opacity-85 hover:opacity-100 scale-95 hover:scale-105 active:scale-95 transition-all duration-300 border border-emerald-300/40"
         aria-label="Chamar no WhatsApp"
       >
-        <span className="absolute -top-1 -right-1 flex h-3 w-3">
+        <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-3 w-3 bg-[#F5B83D]" />
+          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#F5B83D]" />
         </span>
 
-        <MessageCircle className="w-6 h-6 fill-white" />
+        <MessageCircle className="w-5 h-5 fill-white" />
       </a>
     </div>
   );

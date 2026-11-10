@@ -1,14 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { MessageCircle, ArrowDown, Download } from 'lucide-react';
-import { BRAND, IMAGES, getWhatsAppLink } from '../constants';
+import { MessageCircle, ArrowDown } from 'lucide-react';
+import { IMAGES, getWhatsAppLink } from '../constants';
+
+const DESKTOP_SCALE = 0.75; // 1 = full size; 0.75 = refined desktop size
+const MOBILE_SCALE = 0.92;   // 92% on mobile for clean breathing room without clipping top/bottom
 
 const VIDEO_SRC = '/assets/aistudio/Layers_floating_above_a_a__cup_56da53fb_20a05278.mp4';
-
-interface WebPFrame {
-  index: number;
-  bitmap: ImageBitmap;
-  blob?: Blob;
-}
 
 export const HeroScrollCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,69 +14,122 @@ export const HeroScrollCanvas: React.FC = () => {
 
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingPercent, setLoadingPercent] = useState(0);
-  const [statusText, setStatusText] = useState('Preparando seu açaí...');
-  const [frames, setFrames] = useState<WebPFrame[]>([]);
-  const [isDevMode, setIsDevMode] = useState(false);
+  const [isLoaderFading, setIsLoaderFading] = useState(false);
+  const [isDebugMode, setIsDebugMode] = useState(false);
 
-  // Lerp frame tracking
+  // Map of index -> ImageBitmap for progressive loading
+  const loadedBitmapsRef = useRef<Map<number, ImageBitmap>>(new Map());
+  const totalFramesRef = useRef(90);
+
+  // Cached layout & scroll references
+  const heroTopRef = useRef(0);
+  const heroHeightRef = useRef(1);
+  const innerHeightRef = useRef(1);
+
+  // Target and Lerp Frame tracking
   const currentFrameRef = useRef(0);
   const targetFrameRef = useRef(0);
+  const isHeroVisibleRef = useRef(true);
 
-  // Check ?dev=1
+  // Check ?debug=1
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('dev') === '1') {
-      setIsDevMode(true);
-    }
+    if (params.get('debug') === '1') setIsDebugMode(true);
   }, []);
 
-  // Frame Extraction Engine
+  // Recalculate layout metrics (heroTop and heroHeight) robustly
+  const updateLayoutMetrics = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const computedTop = rect.top + scrollY;
+    const computedHeight = rect.height;
+    const viewportH = window.innerHeight || 1;
+
+    heroTopRef.current = !isNaN(computedTop) && computedTop >= 0 ? computedTop : 0;
+    heroHeightRef.current = !isNaN(computedHeight) && computedHeight > 0 ? computedHeight : viewportH * 4;
+    innerHeightRef.current = viewportH;
+
+    if (isDebugMode) {
+      console.log('[DEBUG] Layout recalculated:', {
+        heroTop: heroTopRef.current,
+        heroHeight: heroHeightRef.current,
+        innerHeight: innerHeightRef.current,
+      });
+    }
+  };
+
+  // Periodically recalculate layout metrics for 5s after mount
+  useEffect(() => {
+    updateLayoutMetrics();
+    const interval = setInterval(() => {
+      updateLayoutMetrics();
+    }, 1000);
+
+    const timer = setTimeout(() => {
+      clearInterval(interval);
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
+  }, [isDebugMode]);
+
+  // Progressive Frame Extraction Engine with Live Video Fallback
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     let isCancelled = false;
 
-    const extractFrames = async () => {
-      try {
-        setStatusText('Iniciando vídeo do açaí...');
-        setLoadingPercent(5);
+    // Safety timeout: fade loader after max 1.5s regardless
+    const safetyTimer = setTimeout(() => {
+      setIsLoaderFading(true);
+      setTimeout(() => setIsLoading(false), 400);
+    }, 1500);
 
-        if (video.readyState < 1) {
-          await new Promise((resolve) => {
-            const onMeta = () => {
-              video.removeEventListener('loadedmetadata', onMeta);
-              resolve(true);
+    const extractProgressiveFrames = async () => {
+      try {
+        video.muted = true;
+        video.playsInline = true;
+
+        if (video.readyState < 2) {
+          await new Promise<void>((resolve) => {
+            const onLoaded = () => {
+              video.removeEventListener('loadeddata', onLoaded);
+              video.removeEventListener('canplay', onLoaded);
+              resolve();
             };
-            video.addEventListener('loadedmetadata', onMeta);
+            video.addEventListener('loadeddata', onLoaded);
+            video.addEventListener('canplay', onLoaded);
+            setTimeout(onLoaded, 500);
           });
         }
 
-        const duration = video.duration;
-        if (!duration || isNaN(duration)) {
-          throw new Error('Duração do vídeo inválida');
-        }
-
+        const duration = video.duration || 4.0;
         const isMobile = window.innerWidth < 640;
         const totalFrames = isMobile ? 60 : 90;
-        const targetWidth = 720;
-        const aspect = video.videoHeight / (video.videoWidth || 1);
-        const targetHeight = Math.round(targetWidth * (aspect || 1.777));
+        totalFramesRef.current = totalFrames;
+
+        const vWidth = video.videoWidth || (isMobile ? 720 : 1080);
+        const vHeight = video.videoHeight || (isMobile ? 1280 : 1920);
+
+        const targetWidth = isMobile ? 720 : 1080;
+        const aspect = vHeight / vWidth;
+        const targetHeight = Math.round(targetWidth * aspect);
 
         const offCanvas = document.createElement('canvas');
         offCanvas.width = targetWidth;
         offCanvas.height = targetHeight;
-        const offCtx = offCanvas.getContext('2d');
+        const offCtx = offCanvas.getContext('2d', { alpha: false, desynchronized: true });
 
-        if (!offCtx) throw new Error('Não foi possível obter o contexto 2D');
+        // Extract a specific frame index cleanly
+        const extractSingleFrame = async (idx: number): Promise<ImageBitmap | null> => {
+          if (isCancelled || !offCtx) return null;
+          if (loadedBitmapsRef.current.has(idx)) return loadedBitmapsRef.current.get(idx)!;
 
-        const extractedList: WebPFrame[] = [];
-
-        for (let i = 0; i < totalFrames; i++) {
-          if (isCancelled) return;
-
-          const targetTime = (i / (totalFrames - 1)) * duration;
+          const targetTime = (idx / (totalFrames - 1)) * duration;
           video.currentTime = targetTime;
 
           await new Promise<void>((resolve) => {
@@ -90,122 +140,229 @@ export const HeroScrollCanvas: React.FC = () => {
               resolve();
             };
             video.addEventListener('seeked', onSeeked);
-            timeoutId = setTimeout(() => {
-              video.removeEventListener('seeked', onSeeked);
-              resolve();
-            }, 300);
+            timeoutId = setTimeout(onSeeked, 250);
           });
 
-          offCtx.clearRect(0, 0, targetWidth, targetHeight);
           offCtx.drawImage(video, 0, 0, targetWidth, targetHeight);
-
-          const bitmap = await createImageBitmap(offCanvas);
-
-          let blob: Blob | undefined;
-          if (isDevMode) {
-            blob = await new Promise<Blob>((res) => {
-              offCanvas.toBlob((b) => res(b || new Blob()), 'image/webp', 0.8);
-            });
+          try {
+            const bitmap = await createImageBitmap(offCanvas);
+            loadedBitmapsRef.current.set(idx, bitmap);
+            return bitmap;
+          } catch (e) {
+            return null;
           }
+        };
 
-          extractedList.push({ index: i, bitmap, blob });
-
-          const percent = Math.round(((i + 1) / totalFrames) * 100);
-          setLoadingPercent(percent);
-          setStatusText(`Preparando seu açaí... ${percent}%`);
-        }
-
+        // PASS 1: Frame 0 & Last Frame
+        await extractSingleFrame(0);
         if (!isCancelled) {
-          setFrames(extractedList);
-          setIsLoading(false);
+          setIsLoaderFading(true);
+          setTimeout(() => setIsLoading(false), 400);
         }
+
+        await extractSingleFrame(totalFrames - 1);
+        updateLayoutMetrics();
+
+        // PASS 2: Stride 6 (0, 6, 12, 18, ...)
+        for (let i = 0; i < totalFrames; i += 6) {
+          if (isCancelled) return;
+          await extractSingleFrame(i);
+        }
+
+        // PASS 3: Stride 3 (3, 9, 15, ...)
+        for (let i = 3; i < totalFrames; i += 6) {
+          if (isCancelled) return;
+          await extractSingleFrame(i);
+        }
+
+        // PASS 4: All remaining frames in small background batches
+        for (let i = 0; i < totalFrames; i++) {
+          if (isCancelled) return;
+          if (!loadedBitmapsRef.current.has(i)) {
+            await extractSingleFrame(i);
+            if (i % 6 === 0) {
+              await new Promise((res) => setTimeout(res, 10));
+            }
+          }
+        }
+
+        updateLayoutMetrics();
+        clearTimeout(safetyTimer);
       } catch (err) {
-        console.warn('Fallback ativado:', err);
-        setIsLoading(false);
+        if (isDebugMode) console.warn('[DEBUG] Erro na extração de frames:', err);
+        setIsLoaderFading(true);
+        setTimeout(() => setIsLoading(false), 400);
       }
     };
 
-    extractFrames();
+    extractProgressiveFrames();
+
     return () => {
       isCancelled = true;
+      clearTimeout(safetyTimer);
     };
-  }, [isDevMode]);
+  }, [isDebugMode]);
 
-  // Scroll Progress Tracking
+  // IntersectionObserver to pause render loop when Hero is out of viewport
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          isHeroVisibleRef.current = entry.isIntersecting;
+        });
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Passive Scroll & Debounced Resize Handler
   useEffect(() => {
     const handleScroll = () => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const totalScrollableHeight = rect.height - window.innerHeight;
-      if (totalScrollableHeight <= 0) return;
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      const top = heroTopRef.current || 0;
+      const height = heroHeightRef.current || (window.innerHeight * 4);
+      const innerH = innerHeightRef.current || window.innerHeight;
 
-      const currentScroll = -rect.top;
-      const progress = Math.min(Math.max(currentScroll / totalScrollableHeight, 0), 1);
+      const totalScrollable = Math.max(1, height - innerH);
+      const progress = Math.min(Math.max((scrollY - top) / totalScrollable, 0), 1);
+
       setScrollProgress(progress);
+      targetFrameRef.current = progress * (totalFramesRef.current - 1);
 
-      if (frames.length > 0) {
-        targetFrameRef.current = progress * (frames.length - 1);
+      // Also update videocurrentTime directly if bitmaps aren't fully extracted yet
+      if (videoRef.current && loadedBitmapsRef.current.size < 10) {
+        const duration = videoRef.current.duration || 4.0;
+        videoRef.current.currentTime = progress * duration;
       }
+
+      if (isDebugMode) {
+        console.log(`[DEBUG] Scroll: progress=${progress.toFixed(3)}, targetFrame=${targetFrameRef.current.toFixed(1)}, loadedCount=${loadedBitmapsRef.current.size}`);
+      }
+    };
+
+    let resizeTimer: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        updateLayoutMetrics();
+        handleScroll();
+      }, 150);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [frames.length]);
+    window.addEventListener('resize', handleResize, { passive: true });
+    window.addEventListener('orientationchange', handleResize, { passive: true });
 
-  // Canvas Render Loop with Lerp & Cover Aspect Scaling
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      clearTimeout(resizeTimer);
+    };
+  }, [isDebugMode]);
+
+  // Helper to find closest already loaded frame
+  const getClosestLoadedFrame = (targetIdx: number): ImageBitmap | null => {
+    const map = loadedBitmapsRef.current;
+    if (map.size === 0) return null;
+
+    const roundedTarget = Math.round(targetIdx);
+    if (map.has(roundedTarget)) return map.get(roundedTarget)!;
+
+    let bestIdx = -1;
+    let minDiff = Infinity;
+    for (const idx of map.keys()) {
+      const diff = Math.abs(idx - targetIdx);
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestIdx = idx;
+      }
+    }
+    return bestIdx >= 0 ? map.get(bestIdx)! : null;
+  };
+
+  // Canvas Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
     if (!ctx) return;
 
-    let animationFrameId: number;
+    ctx.imageSmoothingQuality = 'medium';
 
-    const render = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let animationFrameId: number;
+    let lastTime = performance.now();
+
+    const applyCanvasDimensions = () => {
+      const isMobile = window.innerWidth < 640;
+      const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2.0);
       const displayW = window.innerWidth;
       const displayH = window.innerHeight;
 
-      if (canvas.width !== displayW * dpr || canvas.height !== displayH * dpr) {
-        canvas.width = displayW * dpr;
-        canvas.height = displayH * dpr;
+      const targetW = Math.round(displayW * dpr);
+      const targetH = Math.round(displayH * dpr);
+
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
       }
+    };
+
+    applyCanvasDimensions();
+
+    const render = (now: number) => {
+      animationFrameId = requestAnimationFrame(render);
+
+      if (!isHeroVisibleRef.current) return;
+
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // Smooth Lerp calculation
+      const lerpFactor = 1 - Math.pow(0.001, dt);
+      currentFrameRef.current += (targetFrameRef.current - currentFrameRef.current) * lerpFactor;
+
+      const displayW = window.innerWidth;
+      const displayH = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, displayW < 640 ? 1.5 : 2.0);
 
       ctx.save();
       ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, displayW, displayH);
 
-      // Lerp frame smoothing
-      currentFrameRef.current += (targetFrameRef.current - currentFrameRef.current) * 0.15;
-      const frameIdx = Math.min(
-        frames.length - 1,
-        Math.max(0, Math.round(currentFrameRef.current))
-      );
+      const closestBitmap = getClosestLoadedFrame(currentFrameRef.current);
 
-      if (frames.length > 0 && frames[frameIdx]) {
-        drawCoverBitmap(ctx, frames[frameIdx].bitmap, displayW, displayH);
+      if (closestBitmap) {
+        drawCoverBitmap(ctx, closestBitmap, displayW, displayH);
+      } else if (videoRef.current && videoRef.current.readyState >= 2) {
+        drawVideoFallback(ctx, videoRef.current, displayW, displayH);
       } else {
         drawProceduralAcaiBackground(ctx, displayW, displayH);
       }
 
-      // Very soft & subtle gradient scrim (max 40% dark purple) for text contrast without obscuring video
+      // Static dark purple gradient scrim for text contrast
       const softGradient = ctx.createLinearGradient(0, 0, 0, displayH);
-      softGradient.addColorStop(0, 'rgba(46, 15, 61, 0.45)');
-      softGradient.addColorStop(0.4, 'rgba(46, 15, 61, 0.1)');
-      softGradient.addColorStop(0.7, 'rgba(46, 15, 61, 0.2)');
-      softGradient.addColorStop(1, 'rgba(46, 15, 61, 0.65)');
+      softGradient.addColorStop(0, 'rgba(26, 11, 38, 0.45)');
+      softGradient.addColorStop(0.4, 'rgba(26, 11, 38, 0.1)');
+      softGradient.addColorStop(0.7, 'rgba(26, 11, 38, 0.2)');
+      softGradient.addColorStop(1, 'rgba(26, 11, 38, 0.65)');
       ctx.fillStyle = softGradient;
       ctx.fillRect(0, 0, displayW, displayH);
 
       ctx.restore();
-
-      animationFrameId = requestAnimationFrame(render);
     };
 
     animationFrameId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [frames]);
+  }, []);
 
   const drawCoverBitmap = (
     ctx: CanvasRenderingContext2D,
@@ -213,58 +370,104 @@ export const HeroScrollCanvas: React.FC = () => {
     canvasW: number,
     canvasH: number
   ) => {
+    ctx.fillStyle = '#1A0B26';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const scale = canvasW >= 1024 ? DESKTOP_SCALE : MOBILE_SCALE;
+
     const bitmapRatio = bitmap.width / bitmap.height;
     const canvasRatio = canvasW / canvasH;
-    let renderW: number, renderH: number, offsetX: number, offsetY: number;
+    let baseW: number, baseH: number;
 
     if (canvasRatio > bitmapRatio) {
-      renderW = canvasW;
-      renderH = canvasW / bitmapRatio;
-      offsetX = 0;
-      offsetY = (canvasH - renderH) / 2;
+      baseW = canvasW;
+      baseH = canvasW / bitmapRatio;
     } else {
-      renderH = canvasH;
-      renderW = canvasH * bitmapRatio;
-      offsetX = (canvasW - renderW) / 2;
-      offsetY = 0;
+      baseH = canvasH;
+      baseW = canvasH * bitmapRatio;
     }
 
-    ctx.drawImage(bitmap, offsetX, offsetY, renderW, renderH);
+    const drawW = baseW * scale;
+    const drawH = baseH * scale;
+    const offsetX = (canvasW - drawW) / 2;
+    const offsetY = (canvasH - drawH) / 2;
+
+    ctx.drawImage(bitmap, offsetX, offsetY, drawW, drawH);
+
+    if (scale < 1) {
+      const padX = drawW * 0.08;
+      const padY = drawH * 0.08;
+
+      const gradTop = ctx.createLinearGradient(0, offsetY, 0, offsetY + padY);
+      gradTop.addColorStop(0, '#1A0B26');
+      gradTop.addColorStop(1, 'rgba(26, 11, 38, 0)');
+      ctx.fillStyle = gradTop;
+      ctx.fillRect(offsetX, offsetY, drawW, padY);
+
+      const gradBottom = ctx.createLinearGradient(0, offsetY + drawH - padY, 0, offsetY + drawH);
+      gradBottom.addColorStop(0, 'rgba(26, 11, 38, 0)');
+      gradBottom.addColorStop(1, '#1A0B26');
+      ctx.fillStyle = gradBottom;
+      ctx.fillRect(offsetX, offsetY + drawH - padY, drawW, padY);
+
+      const gradLeft = ctx.createLinearGradient(offsetX, 0, offsetX + padX, 0);
+      gradLeft.addColorStop(0, '#1A0B26');
+      gradLeft.addColorStop(1, 'rgba(26, 11, 38, 0)');
+      ctx.fillStyle = gradLeft;
+      ctx.fillRect(offsetX, offsetY, padX, drawH);
+
+      const gradRight = ctx.createLinearGradient(offsetX + drawW - padX, 0, offsetX + drawW, 0);
+      gradRight.addColorStop(0, 'rgba(26, 11, 38, 0)');
+      gradRight.addColorStop(1, '#1A0B26');
+      ctx.fillStyle = gradRight;
+      ctx.fillRect(offsetX + drawW - padX, offsetY, padX, drawH);
+    }
+  };
+
+  const drawVideoFallback = (
+    ctx: CanvasRenderingContext2D,
+    video: HTMLVideoElement,
+    canvasW: number,
+    canvasH: number
+  ) => {
+    ctx.fillStyle = '#1A0B26';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    const scale = canvasW >= 1024 ? DESKTOP_SCALE : MOBILE_SCALE;
+    const vW = video.videoWidth || 720;
+    const vH = video.videoHeight || 1280;
+    const bitmapRatio = vW / vH;
+    const canvasRatio = canvasW / canvasH;
+    let baseW: number, baseH: number;
+
+    if (canvasRatio > bitmapRatio) {
+      baseW = canvasW;
+      baseH = canvasW / bitmapRatio;
+    } else {
+      baseH = canvasH;
+      baseW = canvasH * bitmapRatio;
+    }
+
+    const drawW = baseW * scale;
+    const drawH = baseH * scale;
+    const offsetX = (canvasW - drawW) / 2;
+    const offsetY = (canvasH - drawH) / 2;
+
+    ctx.drawImage(video, offsetX, offsetY, drawW, drawH);
   };
 
   const drawProceduralAcaiBackground = (ctx: CanvasRenderingContext2D, w: number, h: number) => {
     const bgGrad = ctx.createRadialGradient(w / 2, h / 2, 100, w / 2, h / 2, Math.max(w, h));
     bgGrad.addColorStop(0, '#6B2B83');
     bgGrad.addColorStop(0.6, '#3b124d');
-    bgGrad.addColorStop(1, '#2E0F3D');
+    bgGrad.addColorStop(1, '#1A0B26');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
   };
 
-  // Dev mode download
-  const downloadAllFrames = async () => {
-    if (frames.length === 0) return;
-    for (let i = 0; i < frames.length; i++) {
-      const item = frames[i];
-      if (item.blob) {
-        const url = URL.createObjectURL(item.blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `frame_${String(i + 1).padStart(4, '0')}.webp`;
-        a.click();
-        URL.revokeObjectURL(url);
-        await new Promise((r) => setTimeout(r, 40));
-      }
-    }
-  };
-
-  // Precise Range Opacity & Easing Calculations for standard cubic-bezier(0.22, 1, 0.36, 1) style smooth fades:
-  // Stage 1: 0% to 20% (0.0 to 0.20)
+  // Text stage opacity easing
   const p1 = scrollProgress;
-  const stage1Opacity =
-    p1 <= 0.18 ? 1 : p1 <= 0.24 ? 1 - (p1 - 0.18) / 0.06 : 0;
-
-  // Stage 2: 25% to 45% (0.25 to 0.45)
+  const stage1Opacity = p1 <= 0.18 ? 1 : p1 <= 0.24 ? 1 - (p1 - 0.18) / 0.06 : 0;
   const stage2Opacity =
     p1 >= 0.25 && p1 <= 0.45
       ? p1 <= 0.30
@@ -273,8 +476,6 @@ export const HeroScrollCanvas: React.FC = () => {
         ? 1 - (p1 - 0.40) / 0.05
         : 1
       : 0;
-
-  // Stage 3: 50% to 70% (0.50 to 0.70)
   const stage3Opacity =
     p1 >= 0.50 && p1 <= 0.70
       ? p1 <= 0.55
@@ -283,71 +484,56 @@ export const HeroScrollCanvas: React.FC = () => {
         ? 1 - (p1 - 0.65) / 0.05
         : 1
       : 0;
-
-  // Stage 4: 75% to 100% (0.75 to 1.0)
   const stage4Opacity = p1 >= 0.75 ? Math.min(1, (p1 - 0.75) / 0.08) : 0;
 
   return (
-    <div id="inicio" ref={containerRef} className="relative h-[400vh] w-full bg-[#2E0F3D]">
-      {/* 2px Golden Scroll Progress Bar at the top of the viewport */}
+    <div id="inicio" ref={containerRef} className="relative h-[400vh] w-full bg-[#0B0710]">
+      {/* 2px Golden Scroll Progress Bar */}
       <div
-        className="fixed top-0 left-0 h-[2px] bg-[#F5B83D] z-50 transition-all duration-75 shadow-[0_0_8px_#F5B83D]"
+        className="fixed top-0 left-0 h-[2px] bg-[#F5B83D] z-50 transition-all duration-75"
         style={{ width: `${scrollProgress * 100}%` }}
       />
 
-      {/* Offscreen video element */}
+      {/* Offscreen video element - Same-origin video without crossOrigin attribute */}
       <video
         ref={videoRef}
         src={VIDEO_SRC}
         muted
         playsInline
         preload="auto"
-        className="hidden"
-        crossOrigin="anonymous"
+        className="pointer-events-none opacity-0 absolute w-1 h-1 overflow-hidden z-[-100]"
       />
 
       {/* Sticky Viewport */}
-      <div className="sticky top-0 left-0 w-full h-screen overflow-hidden flex items-center justify-center">
+      <div className="sticky top-0 left-0 w-full h-screen h-[100dvh] overflow-hidden flex items-center justify-center bg-[#0B0710] z-0">
         {/* Fullscreen Video Canvas */}
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full block object-cover z-0"
+          style={{ width: '100%', height: '100dvh', display: 'block' }}
+        />
 
-        {/* Loading Overlay */}
+        {/* Clean, Fast Loading Overlay with Logo */}
         {isLoading && (
-          <div className="absolute inset-0 z-40 bg-[#2b0d38] flex flex-col items-center justify-center p-6 text-white text-center">
-            <div className="relative w-16 h-16 mb-5 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-4 border-[#3b124d] border-t-[#F5B83D] animate-spin" />
+          <div
+            className={`absolute inset-0 z-40 bg-[#0B0710] flex flex-col items-center justify-center p-6 text-white text-center transition-opacity duration-400 ${
+              isLoaderFading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+          >
+            <div className="relative w-20 h-20 mb-3 flex items-center justify-center">
               <img
                 src={IMAGES.logo}
-                alt="Logo Açaí Veg"
-                className="w-8 h-8 rounded-full object-contain bg-white p-0.5"
+                alt="Açaí Veg Laranjeiras"
+                className="w-16 h-16 object-contain animate-pulse drop-shadow-[0_4px_14px_rgba(245,184,61,0.35)]"
               />
             </div>
-
-            <h3 className="font-baloo text-xl sm:text-2xl font-semibold text-[#F5B83D]">
-              {statusText}
-            </h3>
-
-            <div className="w-56 h-2 bg-purple-950 rounded-full mt-4 overflow-hidden border border-[#F5B83D]/30 shadow-inner">
-              <div
-                className="h-full bg-[#3C9A34] transition-all duration-150 rounded-full"
-                style={{ width: `${loadingPercent}%` }}
-              />
-            </div>
+            <p className="font-serif-luxury text-sm tracking-widest text-[#F5B83D] uppercase font-bold">
+              Açaí Veg
+            </p>
           </div>
         )}
 
-        {/* Dev Mode Download Button (?dev=1) */}
-        {isDevMode && !isLoading && (
-          <button
-            onClick={downloadAllFrames}
-            className="absolute top-20 left-4 z-30 bg-[#2b0d38]/80 text-[#F5B83D] border border-[#F5B83D]/40 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-xl hover:bg-[#F5B83D] hover:text-purple-950 transition-all backdrop-blur-md"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Baixar frames (.zip)</span>
-          </button>
-        )}
-
-        {/* Subtle "Role" indicator near bottom that fades out immediately after scroll starts */}
+        {/* Scroll hint indicator */}
         <div
           className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1 text-xs font-medium text-white/70 transition-opacity duration-300 pointer-events-none ${
             scrollProgress > 0.05 ? 'opacity-0' : 'opacity-100 animate-bounce'
@@ -357,37 +543,28 @@ export const HeroScrollCanvas: React.FC = () => {
           <ArrowDown className="w-3.5 h-3.5 text-[#F5B83D]" />
         </div>
 
-        {/* OVERLAID ELEGANT TEXTS (Sided / Off-center on Desktop, Bottom Faixinha on Mobile, NO Card, NO Green Border) */}
-
-        {/* STAGE 1 (0% to 20%): Left Aligned */}
+        {/* Overlaid Texts */}
         <div
-          className="absolute z-10 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] pointer-events-none left-6 right-6 sm:right-auto sm:left-12 lg:left-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
+          className="absolute z-10 transition-all duration-300 pointer-events-none left-6 right-6 sm:right-auto sm:left-12 lg:left-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
           style={{
             opacity: stage1Opacity,
             transform: `translateY(${(1 - stage1Opacity) * 20}px)`,
             pointerEvents: stage1Opacity > 0.5 ? 'auto' : 'none',
           }}
         >
-          {/* Subtle Golden Accent Line */}
           <div className="w-10 h-0.5 bg-[#F5B83D] mb-3 rounded-full" />
-
-          {/* Title */}
           <h1 className="font-poppins text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold text-white tracking-tight leading-snug drop-shadow-lg">
             A felicidade também vem em forma de açaí.
           </h1>
-
-          {/* Subtitle */}
           <p className="mt-2.5 text-[clamp(0.9rem,1.4vw,1.1rem)] text-[#F4E9F8]/85 font-normal leading-relaxed drop-shadow-md">
             O açaí mais cremoso e recheado de Caieiras.
           </p>
-
-          {/* Subtle Green Pill Button */}
           <div className="mt-5">
             <a
               href={getWhatsAppLink('Olá! Vim pela Hero do site e gostaria de pedir açaí!')}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#3C9A34] text-[#3C9A34] hover:bg-[#3C9A34] hover:text-white text-xs sm:text-sm font-semibold backdrop-blur-md shadow-lg transition-all duration-200"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[#3C9A34] text-[#3C9A34] hover:bg-[#3C9A34] hover:text-white text-xs sm:text-sm font-semibold shadow-lg transition-all duration-200"
             >
               <MessageCircle className="w-4 h-4 fill-current" />
               <span>Chamar no WhatsApp</span>
@@ -395,75 +572,55 @@ export const HeroScrollCanvas: React.FC = () => {
           </div>
         </div>
 
-        {/* STAGE 2 (25% to 45%): Right Aligned */}
         <div
-          className="absolute z-10 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] pointer-events-none left-6 right-6 sm:left-auto sm:right-12 lg:right-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
+          className="absolute z-10 transition-all duration-300 pointer-events-none left-6 right-6 sm:left-auto sm:right-12 lg:right-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
           style={{
             opacity: stage2Opacity,
             transform: `translateY(${(1 - stage2Opacity) * 20}px)`,
             pointerEvents: stage2Opacity > 0.5 ? 'auto' : 'none',
           }}
         >
-          {/* Subtle Golden Accent Line */}
           <div className="w-10 h-0.5 bg-[#F5B83D] mb-3 rounded-full" />
-
-          {/* Title */}
           <h2 className="font-poppins text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold text-white tracking-tight leading-snug drop-shadow-lg">
             Camada por camada.
           </h2>
-
-          {/* Subtitle */}
           <p className="mt-2.5 text-[clamp(0.9rem,1.4vw,1.1rem)] text-[#F4E9F8]/85 font-normal leading-relaxed drop-shadow-md">
             Polpa selecionada, sem cristais de gelo.
           </p>
         </div>
 
-        {/* STAGE 3 (50% to 70%): Left Aligned */}
         <div
-          className="absolute z-10 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] pointer-events-none left-6 right-6 sm:right-auto sm:left-12 lg:left-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
+          className="absolute z-10 transition-all duration-300 pointer-events-none left-6 right-6 sm:right-auto sm:left-12 lg:left-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
           style={{
             opacity: stage3Opacity,
             transform: `translateY(${(1 - stage3Opacity) * 20}px)`,
             pointerEvents: stage3Opacity > 0.5 ? 'auto' : 'none',
           }}
         >
-          {/* Subtle Golden Accent Line */}
           <div className="w-10 h-0.5 bg-[#F5B83D] mb-3 rounded-full" />
-
-          {/* Title */}
           <h2 className="font-poppins text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold text-white tracking-tight leading-snug drop-shadow-lg">
             Do jeito que você ama.
           </h2>
-
-          {/* Subtitle */}
           <p className="mt-2.5 text-[clamp(0.9rem,1.4vw,1.1rem)] text-[#F4E9F8]/85 font-normal leading-relaxed drop-shadow-md">
             Creme de avelã, paçoca, uvas verdes e Kit Kat.
           </p>
         </div>
 
-        {/* STAGE 4 (75% to 100%): Right/Center-Bottom Aligned */}
         <div
-          className="absolute z-10 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] pointer-events-none left-6 right-6 sm:left-auto sm:right-12 lg:right-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
+          className="absolute z-10 transition-all duration-300 pointer-events-none left-6 right-6 sm:left-auto sm:right-12 lg:right-20 bottom-16 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 max-w-md text-left"
           style={{
             opacity: stage4Opacity,
             transform: `translateY(${(1 - stage4Opacity) * 20}px)`,
             pointerEvents: stage4Opacity > 0.5 ? 'auto' : 'none',
           }}
         >
-          {/* Subtle Golden Accent Line */}
           <div className="w-10 h-0.5 bg-[#F5B83D] mb-3 rounded-full" />
-
-          {/* Title */}
           <h2 className="font-poppins text-[clamp(1.5rem,3.5vw,2.75rem)] font-semibold text-white tracking-tight leading-snug drop-shadow-lg">
             Monte o seu copo.
           </h2>
-
-          {/* Subtitle */}
           <p className="mt-2.5 text-[clamp(0.9rem,1.4vw,1.1rem)] text-[#F4E9F8]/85 font-normal leading-relaxed drop-shadow-md">
             Escolha os seus acompanhamentos preferidos.
           </p>
-
-          {/* Green Pill Button */}
           <div className="mt-5">
             <a
               href={getWhatsAppLink('Olá! Rolei o site e quero montar meu copo agora!')}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, HelpCircle, MessageCircle } from 'lucide-react';
+import { ChevronDown, MessageCircle } from 'lucide-react';
 import { getWhatsAppLink } from '../constants';
 
 interface FaqItem {
@@ -26,67 +26,70 @@ export const Faq: React.FC = () => {
       id: 2,
       question: 'Como funciona a entrega e qual o raio de atendimento em Caieiras?',
       answer:
-        'Fazemos entregas ágeis em Laranjeiras, Caieiras e regiões vizinhas. Consulte a taxa pelo WhatsApp! Seu açaí viaja embalado com isolamento térmico para chegar super geladinho.',
+        'Entregamos em Laranjeiras, Caieiras e bairros vizinhos. Consulte a taxa pelo WhatsApp! Seu copo viaja embalado em isolamento térmico para chegar super geladinho.',
     },
     {
       id: 3,
-      question: 'Quais os tamanhos dos copos e adicionais disponíveis?',
+      question: 'Quais são os tamanhos dos copos e opções disponíveis?',
       answer:
-        'Trabalhamos com copos de 300ml, 500ml e o super copo 700ml. Oferecemos mais de 15 acompanhamentos, incluindo Kit Kat, creme de avelã (Nutella), leite em pó Ninho, paçoca, condensed milk e frutas frescas.',
+        'Trabalhamos com o Açaí 300ml clássico, o Super Copo 700ml completo e a garrafa especial de Açaí Recheado com Creme de Rafaello.',
     },
     {
       id: 4,
-      question: 'Vocês fazem pedidos para festas, aniversários e eventos corporativos?',
+      question: 'Posso escolher meus toppings e adicionais?',
       answer:
-        'Sim! Aceitamos encomendas especiais e minicopos para comemorações e empresas. Entre em contato com antecedência pelo WhatsApp para condições especiais.',
+        'Com certeza! Cada copo vem com os toppings tradicionais premiados (Nutella, Kit Kat, Paçoca, Ninho, Uva Verde) e você pode solicitar ajustes direto no WhatsApp.',
     },
     {
       id: 5,
-      question: 'Possuem opções com frutas da época e sem açúcar?',
+      question: 'Vocês fazem pedidos para festas, aniversários e eventos corporativos?',
       answer:
-        'Oferecemos açaí puro selecionado e acompanhamentos variados como morango, banana e uva verde. Fale conosco no WhatsApp para tirarmos qualquer dúvida.',
+        'Sim! Aceitamos encomendas para eventos e empresas com condições exclusivas. Fale com nossa equipe com antecedência pelo WhatsApp.',
     },
   ];
 
   return (
-    <section id="faq" className="py-20 bg-[#2b0d38] text-white relative z-20 border-t-2 border-purple-800">
+    <div id="faq" className="py-24 bg-[#0B0710] text-white relative z-20 border-t border-white/5">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <div className="font-baloo text-sm font-black text-[#8ec628] uppercase tracking-widest mb-1">
-            [ Tire suas Dúvidas ]
-          </div>
-          <h2 className="font-baloo text-3xl sm:text-5xl font-extrabold text-white">
-            Perguntas Frequentes (FAQ)
+        <div className="text-center mb-16">
+          <span className="text-[11px] font-semibold text-[#F2D27A] uppercase tracking-widest block mb-2">
+            Tire suas Dúvidas
+          </span>
+          <h2 className="font-serif-luxury text-3xl sm:text-5xl font-bold text-white tracking-tight">
+            Perguntas Frequentes
           </h2>
-          <p className="mt-2 text-base text-purple-200">
-            Respostas para as dúvidas mais comuns sobre nosso atendimento e entrega.
+          <p className="mt-3 text-sm sm:text-base text-[#D9C7E6]/85 font-normal">
+            Respostas para as dúvidas mais comuns dos nossos clientes.
           </p>
         </div>
 
+        {/* Accordion with Fine Gold Hairline Dividers */}
         <div className="space-y-4">
           {faqItems.map((item) => {
             const isOpen = openId === item.id;
             return (
               <div
                 key={item.id}
-                className="bg-[#3b124d]/80 rounded-2xl border border-purple-600/40 overflow-hidden transition-all duration-200"
+                className="bg-[#1A1420] rounded-[16px] border border-[#C9971F]/20 overflow-hidden transition-all duration-300"
               >
                 <button
                   onClick={() => toggleFaq(item.id)}
-                  className="w-full px-6 py-5 text-left flex items-center justify-between gap-4 font-baloo text-lg sm:text-xl font-bold text-white hover:text-[#8ec628] transition-colors focus:outline-none"
+                  className="w-full px-6 py-5 text-left flex items-center justify-between gap-4 font-serif-luxury text-base sm:text-lg font-semibold text-white hover:text-[#F2D27A] transition-colors focus:outline-none"
                 >
                   <span>{item.question}</span>
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300 ${
-                      isOpen ? 'rotate-180 bg-[#8ec628] text-purple-950 font-bold' : 'bg-purple-950 text-[#8ec628]'
+                    className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300 ${
+                      isOpen
+                        ? 'bg-[#C9971F] text-[#0B0710] border-[#F2D27A] rotate-180'
+                        : 'bg-white/5 text-[#F2D27A] border-white/10'
                     }`}
                   >
-                    <ChevronDown className="w-5 h-5" />
+                    <ChevronDown className="w-4 h-4" />
                   </div>
                 </button>
 
                 {isOpen && (
-                  <div className="px-6 pb-6 pt-1 text-sm sm:text-base text-purple-100 leading-relaxed border-t border-purple-700/50 font-normal">
+                  <div className="px-6 pb-6 pt-1 text-xs sm:text-sm text-[#D9C7E6]/85 leading-relaxed border-t border-white/5 font-normal">
                     {item.answer}
                   </div>
                 )}
@@ -95,13 +98,14 @@ export const Faq: React.FC = () => {
           })}
         </div>
 
-        <div className="mt-10 p-6 rounded-3xl bg-gradient-to-r from-[#3b124d] to-[#2E0F3D] border-2 border-[#8ec628] flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left shadow-xl">
+        {/* WhatsApp Banner */}
+        <div className="mt-12 p-8 rounded-[20px] bg-gradient-to-r from-[#2A0F3D] to-[#4A1A6B] border border-[#C9971F]/40 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left shadow-2xl">
           <div>
-            <h4 className="font-baloo font-extrabold text-lg text-white">
+            <h4 className="font-serif-luxury font-bold text-lg text-white">
               Ainda tem alguma dúvida?
             </h4>
-            <p className="text-xs sm:text-sm text-purple-200">
-              Chame nossa equipe no WhatsApp para atendimento direto!
+            <p className="text-xs text-[#D9C7E6]/85 mt-1">
+              Fale diretamente com nosso atendimento no WhatsApp!
             </p>
           </div>
 
@@ -109,13 +113,13 @@ export const Faq: React.FC = () => {
             href={getWhatsAppLink('Olá! Tenho uma dúvida sobre a Açaí Veg.')}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-glossy-green px-6 py-2.5 rounded-full text-white font-baloo font-bold text-sm inline-flex items-center gap-2 shrink-0 shadow-md"
+            className="btn-green-wa px-6 py-2.5 rounded-full font-poppins font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shrink-0 shadow-lg hover:scale-105 transition-transform"
           >
-            <MessageCircle className="w-4 h-4 fill-white" />
+            <MessageCircle className="w-4 h-4 fill-current" />
             <span>Falar no WhatsApp</span>
           </a>
         </div>
       </div>
-    </section>
+    </div>
   );
 };

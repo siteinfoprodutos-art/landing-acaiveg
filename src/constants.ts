@@ -18,11 +18,11 @@ export const BRAND = {
 };
 
 export const IMAGES = {
-  logo: "/assets/aistudio/image_a466a17a.png",
+  logo: "/assets/aistudio/logo_78011b09.png",
   heroCover: "/src/assets/images/acai_hero_cover_1794330031265.jpg",
-  copo300ml: "/assets/aistudio/copo300_ff9bd73f.png",
-  copo700ml: "/assets/aistudio/copo700_0eb850f5.png",
-  garrafaRafaello: "/assets/aistudio/garrafa_fba207d6.png",
+  copo300ml: "/assets/aistudio/copo300_e112aa02.png",
+  copo700ml: "/assets/aistudio/copo700_2503eab5.png",
+  garrafaRafaello: "/assets/aistudio/garrafa_d1c967ec.png",
   mascotArara: "/src/assets/images/acai_arara_mascot_1794330031928.jpg",
 };
 

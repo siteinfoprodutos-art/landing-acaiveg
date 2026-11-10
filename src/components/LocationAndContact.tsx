@@ -8,123 +8,133 @@ export const LocationAndContact: React.FC = () => {
   )}`;
 
   return (
-    <section id="localizacao" className="py-20 bg-purple-pattern text-white relative z-20 border-t-4 border-[#8ec628]">
+    <div id="localizacao" className="py-24 bg-[#0B0710] text-white relative z-20 border-t border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
-        <div className="text-center max-w-xl mx-auto mb-14">
-          <div className="font-baloo text-sm font-black text-[#8ec628] uppercase tracking-widest mb-1">
-            [ Localização & Atendimento ]
-          </div>
-          <h2 className="font-baloo text-3xl sm:text-5xl font-extrabold text-white">
-            Onde Encontrar e Como Pedir!
+        <div className="text-center max-w-xl mx-auto mb-16">
+          <span className="text-[11px] font-semibold text-[#F2D27A] uppercase tracking-widest block mb-2">
+            Venha Conhecer
+          </span>
+          <h2 className="font-serif-luxury text-3xl sm:text-5xl font-bold text-white tracking-tight">
+            Localização e Contato
           </h2>
-          <p className="mt-2 text-base text-purple-200">
-            Venha nos visitar em Laranjeiras ou peça direto no WhatsApp para receber em Caieiras - SP.
+          <p className="mt-3 text-sm sm:text-base text-[#D9C7E6]/85 font-normal">
+            Estamos no coração de Laranjeiras, prontos para te atender!
           </p>
         </div>
 
-        {/* 3-Column Bottom Block (Matching Split Açaí bottom section structure) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-[#2b0d38]/90 p-8 sm:p-12 rounded-3xl border-2 border-[#8ec628] shadow-2xl">
-          {/* Left Block: Onde Encontrar! */}
-          <div className="lg:col-span-4 flex flex-col items-center lg:items-start text-center lg:text-left">
-            <h3 className="font-baloo text-3xl font-black text-[#8ec628] tracking-tight">
-              Onde encontrar!
-            </h3>
+        {/* Info Card & Google Maps Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+          {/* Info Card (#1A1420) */}
+          <div className="lg:col-span-5 bg-[#1A1420] p-8 sm:p-10 rounded-[20px] border border-white/10 shadow-2xl flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 rounded-full border border-[#C9971F] bg-[#0B0710] p-1 flex items-center justify-center shrink-0">
+                  <img
+                    src={IMAGES.logo}
+                    alt="Logo Açaí Veg"
+                    className="w-full h-full object-contain rounded-full"
+                  />
+                </div>
+                <div>
+                  <h3 className="font-serif-luxury text-xl font-bold text-white">
+                    Açaí Veg Laranjeiras
+                  </h3>
+                  <span className="text-xs text-[#F2D27A] font-medium">
+                    Loja & Delivery Caieiras
+                  </span>
+                </div>
+              </div>
 
-            <p className="mt-2 text-sm text-purple-100 font-normal leading-relaxed">
-              <strong className="text-white block font-extrabold">{BRAND.name}</strong>
-              {BRAND.address}
-              <br />
-              <span className="text-[#8ec628] font-bold block mt-1">Horário: {BRAND.openingHours}</span>
-            </p>
+              <div className="space-y-5 text-xs sm:text-sm text-[#D9C7E6]/90 font-normal">
+                <div className="flex items-start gap-3.5">
+                  <MapPin className="w-5 h-5 text-[#F2D27A] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-serif-luxury font-bold block text-white text-sm mb-0.5">Endereço:</span>
+                    <span>{BRAND.address}</span>
+                  </div>
+                </div>
 
-            <a
-              href={mapsSearchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-6 btn-glossy-red px-6 py-3 rounded-full text-white font-baloo font-bold text-sm inline-flex items-center gap-2 shadow-lg border border-rose-300/40 hover:scale-105 transition-transform"
-            >
-              <Navigation className="w-4 h-4" />
-              <span>Saiba onde tem Açaí Veg</span>
-            </a>
-          </div>
+                <div className="flex items-start gap-3.5">
+                  <Clock className="w-5 h-5 text-[#F2D27A] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-serif-luxury font-bold block text-white text-sm mb-0.5">Horário de Funcionamento:</span>
+                    <span>{BRAND.openingHours}</span>
+                  </div>
+                </div>
 
-          {/* Center Emblem Logo */}
-          <div className="lg:col-span-4 flex justify-center my-4 lg:my-0">
-            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full border-4 border-[#8ec628] bg-white p-2 shadow-2xl flex items-center justify-center hover:scale-105 transition-transform">
-              <img
-                src={IMAGES.logo}
-                alt="Logo Açaí Veg Laranjeiras"
-                className="w-full h-full object-contain rounded-full"
-              />
+                <div className="flex items-start gap-3.5">
+                  <Phone className="w-5 h-5 text-[#F2D27A] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-serif-luxury font-bold block text-white text-sm mb-0.5">WhatsApp Oficial:</span>
+                    <a
+                      href={getWhatsAppLink()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#3C9A34] font-bold hover:underline"
+                    >
+                      {BRAND.whatsappFormatted}
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Right Block: Pedidos & WhatsApp */}
-          <div className="lg:col-span-4 flex flex-col items-center lg:items-end text-center lg:text-right">
-            <h3 className="font-baloo text-3xl font-black text-[#8ec628] tracking-tight">
-              Peça seu Açaí!
-            </h3>
-
-            <p className="mt-2 text-sm text-purple-100 font-normal leading-relaxed">
-              Sabor inigualável, cremosidade artesanal e delivery rápido na sua porta.
-              <br />
-              <strong className="text-white font-bold block mt-1">WhatsApp: {BRAND.whatsappFormatted}</strong>
-            </p>
-
-            <div className="mt-6 flex flex-wrap gap-2 justify-center lg:justify-end">
+            {/* Action Buttons */}
+            <div className="mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row gap-3">
               <a
-                href={getWhatsAppLink('Olá! Gostaria de fazer um pedido de açaí agora!')}
+                href={getWhatsAppLink('Olá! Gostaria de falar com o atendimento da loja.')}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-glossy-red px-5 py-2.5 rounded-full text-white font-baloo font-bold text-xs inline-flex items-center gap-1.5 shadow-lg hover:scale-105 transition-transform"
+                className="flex-1 py-3 px-4 rounded-full btn-green-wa font-poppins font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg hover:scale-102 transition-all"
               >
-                <MessageCircle className="w-4 h-4 fill-white" />
-                <span>Fazer Pedido</span>
+                <MessageCircle className="w-4 h-4 fill-current" />
+                <span>Chamar no WhatsApp</span>
               </a>
 
               <a
-                href={getWhatsAppLink('Olá! Gostaria de tirar uma dúvida sobre o cardápio.')}
+                href={mapsSearchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-glossy-green px-5 py-2.5 rounded-full text-white font-baloo font-bold text-xs inline-flex items-center gap-1.5 shadow-lg hover:scale-105 transition-transform"
+                className="py-3 px-5 rounded-full btn-gold-outline font-poppins font-semibold text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[#C9971F] hover:text-[#0B0710] transition-all shrink-0"
               >
-                <span>Falar Conosco</span>
+                <Navigation className="w-4 h-4" />
+                <span>Como chegar</span>
               </a>
             </div>
           </div>
-        </div>
 
-        {/* Embedded Interactive Google Map */}
-        <div className="mt-12 h-[380px] rounded-3xl overflow-hidden border-2 border-[#8ec628] shadow-2xl relative bg-purple-950">
-          <iframe
-            title="Mapa de Caieiras SP - Açaí Veg Laranjeiras"
-            src={`https://maps.google.com/maps?q=${encodeURIComponent('Avenida Paulicéia 342 Laranjeiras Caieiras SP')}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
-            width="100%"
-            height="100%"
-            style={{ border: 0 }}
-            allowFullScreen={false}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            className="w-full h-full"
-          />
+          {/* Embedded Google Map with Fine Gold Border */}
+          <div className="lg:col-span-7 h-[420px] lg:h-auto min-h-[380px] rounded-[20px] overflow-hidden border border-[#C9971F]/40 shadow-2xl relative bg-[#1A1420]">
+            <iframe
+              title="Mapa de Caieiras SP - Açaí Veg Laranjeiras"
+              src={`https://maps.google.com/maps?q=${encodeURIComponent('Avenida Paulicéia 342 Laranjeiras Caieiras SP')}&t=&z=16&ie=UTF8&iwloc=&output=embed`}
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              allowFullScreen={false}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              className="w-full h-full"
+            />
 
-          <div className="absolute bottom-4 left-4 right-4 bg-[#2b0d38]/90 backdrop-blur-md p-3 rounded-2xl border border-[#8ec628]/40 text-white text-xs flex items-center justify-between">
-            <span className="font-semibold text-purple-100">
-              📍 Av. Paulicéia, 342 - Laranjeiras, Caieiras - SP
-            </span>
-            <a
-              href={mapsSearchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#8ec628] hover:underline font-bold flex items-center gap-1"
-            >
-              <span>Abrir no Google Maps</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+            <div className="absolute bottom-4 left-4 right-4 bg-[#0B0710]/90 backdrop-blur-md p-3.5 rounded-2xl border border-[#C9971F]/30 text-white text-xs flex items-center justify-between">
+              <span className="font-medium text-[#D9C7E6]">
+                📍 Av. Paulicéia, 342 - Laranjeiras, Caieiras - SP
+              </span>
+              <a
+                href={mapsSearchUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#F2D27A] hover:underline font-bold flex items-center gap-1 shrink-0 ml-2"
+              >
+                <span>Google Maps</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 };

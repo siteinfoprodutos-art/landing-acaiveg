@@ -35,7 +35,7 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
           }
         });
       },
-      { threshold: 0.15 }
+      { threshold: 0.1 }
     );
 
     if (sectionRef.current) {
@@ -47,38 +47,40 @@ export const AnimatedSection: React.FC<AnimatedSectionProps> = ({
     };
   }, []);
 
-  // Inline dynamic styles for section opening reveal
-  const sectionStyle: React.CSSProperties = prefersReducedMotion || isVisible
-    ? {
-        opacity: 1,
-        transform: 'translateY(0) scale(1)',
-        clipPath: 'inset(0 0 0 0 round 0)',
-        transition: 'opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1), clip-path 0.9s cubic-bezier(0.22, 1, 0.36, 1)',
-      }
-    : {
-        opacity: 0,
-        transform: 'translateY(40px) scale(0.97)',
-        clipPath: 'inset(8% 4% 8% 4% round 32px)',
-        transition: 'opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1), clip-path 0.9s cubic-bezier(0.22, 1, 0.36, 1)',
-        willChange: 'opacity, transform, clip-path',
-      };
+  // Performance-optimized section reveal (only opacity & transform, no clip-path, content-visibility auto)
+  const sectionStyle: React.CSSProperties = {
+    contentVisibility: 'auto',
+    containIntrinsicSize: '1px 600px',
+    ...(prefersReducedMotion || isVisible
+      ? {
+          opacity: 1,
+          transform: 'translateY(0)',
+          transition: 'opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
+        }
+      : {
+          opacity: 0,
+          transform: 'translateY(30px)',
+          transition: 'opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
+          willChange: 'opacity, transform',
+        }),
+  };
 
   return (
-    <section id={id} ref={sectionRef} className={`${className} overflow-hidden`} style={sectionStyle}>
+    <section id={id} ref={sectionRef} className={`${className}`} style={sectionStyle}>
       {React.Children.map(children, (child, idx) => {
         if (!React.isValidElement(child)) return child;
-        const staggerDelay = `${idx * 120}ms`;
+        const staggerDelay = `${idx * 100}ms`;
 
         const childStyle: React.CSSProperties = prefersReducedMotion || isVisible
           ? {
               opacity: 1,
               transform: 'translateY(0)',
-              transition: `opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}`,
+              transition: `opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}`,
             }
           : {
               opacity: 0,
-              transform: 'translateY(20px)',
-              transition: `opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}`,
+              transform: 'translateY(15px)',
+              transition: `opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1) ${staggerDelay}`,
             };
 
         return <div style={childStyle}>{child}</div>;
