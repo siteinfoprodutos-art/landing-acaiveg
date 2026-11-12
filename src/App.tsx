@@ -12,6 +12,9 @@ import { Footer } from './components/Footer';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
 import { AnimatedSection } from './components/AnimatedSection';
 
+import { DripDivider } from './components/DripDivider';
+import { MarqueeBanner } from './components/MarqueeBanner';
+
 export default function App() {
   return (
     <div className="min-h-screen bg-[#0B0710] text-white font-poppins selection:bg-[#C9971F] selection:text-[#0B0710] overflow-x-clip">
@@ -28,17 +31,29 @@ export default function App() {
           ========================================================================= */}
       <HeroScrollCanvas />
 
-      {/* 3. Seção "Nossos Destaques" (3 Cards com Badge Foto Circular, Card do meio em Dourado Sólido) */}
+      {/* 3. Seção "Nossos Destaques" (Cortina que sobe por cima do último frame com -mt-[12vh] e cantos 40px) */}
       <AnimatedSection id="destaques">
         <FeaturedProducts />
       </AnimatedSection>
 
-      {/* 4. Seção "A Experiência Açaí Veg" (Diferenciais estilo SeneLeaf Experience) */}
+      {/* Divisória em Gota (scaleY de 0 a 1) com cor do degradê de cima (#2A0F3D) */}
+      <DripDivider fillColor="#2A0F3D" className="-mt-1" />
+
+      {/* Faixa em Movimento Contínuo (Marquee Infinito com Inércia ao Scroll) */}
+      <MarqueeBanner />
+
+      {/* Divisória em Gota sutil invertida ou fluida */}
+      <DripDivider fillColor="#14081F" className="-mb-1" />
+
+      {/* 4. Seção "A Experiência Açaí Veg" */}
       <AnimatedSection id="experiencia">
         <ExperienceSection />
       </AnimatedSection>
 
-      {/* 5. Seção "Como Pedir" (Estilo Your Daily Ritual com Passos Círculos Dourados) */}
+      {/* Divisória em Gota fluida entre Experiência e Como Pedir */}
+      <DripDivider fillColor="#14081F" className="-mt-1" />
+
+      {/* 5. Seção "Como Pedir" (Com a parte antiga da garrafa/poster removida como pedido) */}
       <AnimatedSection id="como-pedir">
         <HowToOrder />
       </AnimatedSection>

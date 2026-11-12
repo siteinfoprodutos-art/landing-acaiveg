@@ -54,7 +54,7 @@ export const Testimonials: React.FC = () => {
   ];
 
   return (
-    <div id="depoimentos" className="py-24 bg-purple-glow text-white relative z-20 border-t border-white/5">
+    <div className="py-24 bg-purple-glow text-white relative z-20 border-t border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Title */}
         <div className="text-center max-w-xl mx-auto mb-16">

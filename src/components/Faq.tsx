@@ -49,7 +49,7 @@ export const Faq: React.FC = () => {
   ];
 
   return (
-    <div id="faq" className="py-24 bg-[#0B0710] text-white relative z-20 border-t border-white/5">
+    <div className="py-24 bg-[#0B0710] text-white relative z-20 border-t border-white/5">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <span className="text-[11px] font-semibold text-[#F2D27A] uppercase tracking-widest block mb-2">

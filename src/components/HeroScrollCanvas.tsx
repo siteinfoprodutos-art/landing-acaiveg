@@ -462,6 +462,9 @@ export const HeroScrollCanvas: React.FC = () => {
             </a>
           </div>
         </div>
+
+        {/* 160px smooth fade transition into the next section curtain */}
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-[#0B0710] to-transparent pointer-events-none z-10" />
       </div>
     </div>
   );

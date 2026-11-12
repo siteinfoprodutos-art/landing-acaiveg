@@ -35,17 +35,35 @@ export const FinalCta: React.FC = () => {
           e recheado direto na sua casa em Caieiras - SP.
         </p>
 
-        {/* Large Green WhatsApp Action Button */}
+        {/* Large Green WhatsApp Action Button with Pulse Ring & Shimmer */}
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <a
-            href={getWhatsAppLink('Olá! Bateu a vontade de açaí e quero pedir agora!')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-green-wa px-10 py-5 rounded-full text-white font-poppins text-lg font-bold shadow-2xl hover:scale-105 transition-all inline-flex items-center gap-3 border border-emerald-300/40"
-          >
-            <MessageCircle className="w-7 h-7 fill-current" />
-            <span>Chamar no WhatsApp Agora</span>
-          </a>
+          <div className="relative inline-block">
+            {/* Gentle Pulse Ring Animation (Item 5) */}
+            <span className="pulse-ring-effect absolute inset-0 rounded-full bg-[#3C9A34] pointer-events-none" />
+
+            <a
+              href={getWhatsAppLink('Olá! Bateu a vontade de açaí e quero pedir agora!')}
+              target="_blank"
+              rel="noopener noreferrer"
+              onMouseMove={(e) => {
+                if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+                const btn = e.currentTarget;
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                const moveX = (x / (rect.width / 2)) * 6;
+                const moveY = (y / (rect.height / 2)) * 6;
+                btn.style.transform = `translate3d(${moveX.toFixed(1)}px, ${moveY.toFixed(1)}px, 0) scale(1.03)`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translate3d(0, 0, 0) scale(1)';
+              }}
+              className="btn-shimmer relative z-10 btn-green-wa px-10 py-5 rounded-full text-white font-poppins text-lg font-bold shadow-2xl transition-all duration-200 inline-flex items-center gap-3 border border-emerald-300/40"
+            >
+              <MessageCircle className="w-7 h-7 fill-current" />
+              <span>Chamar no WhatsApp Agora</span>
+            </a>
+          </div>
         </div>
 
         {/* Trust Badges */}

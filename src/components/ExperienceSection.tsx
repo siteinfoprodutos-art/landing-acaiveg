@@ -26,7 +26,7 @@ export const ExperienceSection: React.FC = () => {
   ];
 
   return (
-    <div id="experiencia" className="py-24 bg-purple-glow text-white relative z-20 border-y border-white/5">
+    <div className="py-24 bg-purple-glow text-white relative z-20 border-y border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
